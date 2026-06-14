@@ -1,118 +1,112 @@
 package com.aliefegur.exomobile.ui
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+
+enum class MotionMode {
+    OPEN, CLOSE
+}
 
 @Composable
 fun MainScreen(
-    onConnectClick: () -> Unit = {},
-    onStartClick: () -> Unit = {},
-    onStopClick: () -> Unit = {}
+    onRun: (MotionMode, Float) -> Unit = { _, _ -> }
 ) {
-    var servo1Angle by remember { mutableFloatStateOf(0f) }
-    var servo2Angle by remember { mutableFloatStateOf(0f) }
+    var selectedMode by remember { mutableStateOf(MotionMode.CLOSE) }
+    var duration by remember { mutableFloatStateOf(3f) }
+    var isRunning by remember { mutableStateOf(false) }
 
-    Scaffold() { innerPadding ->
+    Scaffold { innerPadding ->
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
 
             Text(
-                text = "Finger Exoskeleton Controller",
-                style = MaterialTheme.typography.headlineSmall
+                text = "Exoskeleton Controller",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
             )
 
-            Button(
-                onClick = onConnectClick,
-                modifier = Modifier.fillMaxWidth()
+            Text(
+                text = "Select Motion Mode",
+                style = MaterialTheme.typography.titleMedium
+            )
+
+            // MODE SELECTION
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text("Connect")
+
+                FilterChip(
+                    selected = selectedMode == MotionMode.OPEN,
+                    onClick = { selectedMode = MotionMode.OPEN },
+                    label = { Text("OPEN (Finger Extend)") }
+                )
+
+                FilterChip(
+                    selected = selectedMode == MotionMode.CLOSE,
+                    onClick = { selectedMode = MotionMode.CLOSE },
+                    label = { Text("CLOSE (Finger Flex)") }
+                )
             }
 
             HorizontalDivider()
 
-            ServoControl(
-                title = "Servo 1",
-                angle = servo1Angle,
-                onAngleChange = { servo1Angle = it }
+            // DURATION CONTROL
+            Text(
+                text = "Movement Duration: ${"%.1f".format(duration)} sec",
+                style = MaterialTheme.typography.titleMedium
             )
 
-            ServoControl(
-                title = "Servo 2",
-                angle = servo2Angle,
-                onAngleChange = { servo2Angle = it }
+            Slider(
+                value = duration,
+                onValueChange = { duration = it },
+                valueRange = 0.5f..10f,
+                steps = 18
             )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // RUN BUTTON
+            Button(
+                onClick = {
+                    isRunning = true
+                    onRun(selectedMode, duration)
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                enabled = !isRunning
+            ) {
+                Text(if (isRunning) "Running..." else "RUN MOVEMENT")
+            }
+
+            // STOP BUTTON (future expansion)
+            OutlinedButton(
+                onClick = {
+                    isRunning = false
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("STOP")
+            }
 
             Spacer(modifier = Modifier.weight(1f))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-
-                Button(
-                    onClick = onStartClick,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Start")
-                }
-
-                Button(
-                    onClick = onStopClick,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Stop")
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ServoControl(
-    title: String,
-    angle: Float,
-    onAngleChange: (Float) -> Unit
-) {
-    Column {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-
+            // STATUS
             Text(
-                text = title,
-                modifier = Modifier.weight(1f)
+                text = "Mode: ${selectedMode.name}",
+                style = MaterialTheme.typography.bodyMedium
             )
-
-            Text("${angle.toInt()}°")
         }
-
-        Slider(
-            value = angle,
-            onValueChange = onAngleChange,
-            valueRange = 0f..180f
-        )
     }
 }

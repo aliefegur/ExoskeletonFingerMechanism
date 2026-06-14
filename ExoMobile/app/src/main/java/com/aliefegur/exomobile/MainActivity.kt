@@ -4,50 +4,38 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import com.aliefegur.exomobile.communication.ApiClient
+import com.aliefegur.exomobile.communication.Repository
 import com.aliefegur.exomobile.ui.MainScreen
 import com.aliefegur.exomobile.ui.theme.ExoMobileTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+    private val apiClient = ApiClient("http://192.168.1.50")
+    private val repository = Repository(apiClient)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             ExoMobileTheme {
                 MainScreen(
-                    onConnectClick = {
-                        println("Connect")
-                    },
-                    onStartClick = {
-                        println("Start")
-                    },
-                    onStopClick = {
-                        println("Stop")
+                    onRun = { mode, duration ->
+
+                        CoroutineScope(Dispatchers.IO).launch {
+
+                            val success = repository.sendMotionCommand(
+                                mode = mode.name,
+                                duration = duration
+                            )
+
+                            println("Command sent: $success")
+                        }
                     }
                 )
             }
         }
-    }
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    ExoMobileTheme {
-        Greeting("Android")
     }
 }
