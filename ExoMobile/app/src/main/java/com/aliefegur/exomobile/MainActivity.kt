@@ -15,7 +15,7 @@ class MainActivity : ComponentActivity() {
         // DEPENDENCY GRAPH
         // -------------------------
 
-        val apiClient = ApiClient("http://192.168.1.50")
+        val apiClient = ApiClient("http://192.168.4.1")
         val sessionManager = SessionManager(apiClient)
         val repository = Repository(sessionManager)
         val commandQueue = CommandQueue(repository)

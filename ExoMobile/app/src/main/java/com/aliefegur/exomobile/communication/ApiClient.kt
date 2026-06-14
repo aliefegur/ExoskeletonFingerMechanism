@@ -37,7 +37,7 @@ class ApiClient(private val baseUrl: String) {
 
             connection.disconnect()
 
-            response // ESP32 "OK" döndürmeli
+            response // ESP32 should response "OK"
 
         } catch (e: Exception) {
             connection.disconnect()

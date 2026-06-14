@@ -2,7 +2,6 @@ package com.aliefegur.exomobile.communication
 
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
 class CommandQueue(private val repository: Repository) {
 
@@ -11,11 +10,9 @@ class CommandQueue(private val repository: Repository) {
     private var job: Job? = null
 
     fun send(command: MotionCommand) {
-
         job?.cancel()
 
         job = CoroutineScope(Dispatchers.IO).launch {
-
             delay(150)
 
             val ok = repository.sendMotionCommand(

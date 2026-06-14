@@ -66,6 +66,8 @@ class SessionManager(
 
         } catch (e: Exception) {
 
+            e.printStackTrace()
+
             _state.value = _state.value.copy(
                 isConnected = false,
                 lastError = e.message
