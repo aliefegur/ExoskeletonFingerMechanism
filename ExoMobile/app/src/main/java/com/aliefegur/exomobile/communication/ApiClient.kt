@@ -12,20 +12,22 @@ class ApiClient(private val baseUrl: String) {
         duration: Float
     ): Boolean = withContext(Dispatchers.IO) {
 
-        try {
-            val url = URL("$baseUrl/move")
-            val connection = (url.openConnection() as HttpURLConnection).apply {
-                requestMethod = "POST"
-                setRequestProperty("Content-Type", "application/json")
-                doOutput = true
-                connectTimeout = 3000
-                readTimeout = 3000
-            }
+        val url = URL("$baseUrl/move")
 
-            val json = JSONObject().apply {
-                put("mode", mode)
-                put("duration", duration)
-            }
+        val connection = (url.openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            setRequestProperty("Content-Type", "application/json")
+            doOutput = true
+            connectTimeout = 2000
+            readTimeout = 2000
+        }
+
+        val json = JSONObject().apply {
+            put("mode", mode)
+            put("duration", duration)
+        }
+
+        return@withContext try {
 
             connection.outputStream.use {
                 it.write(json.toString().toByteArray())
@@ -37,7 +39,7 @@ class ApiClient(private val baseUrl: String) {
             code in 200..299
 
         } catch (e: Exception) {
-            e.printStackTrace()
+            connection.disconnect()
             false
         }
     }
