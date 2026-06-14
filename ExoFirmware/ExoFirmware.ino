@@ -1,19 +1,26 @@
+#include <ESP32Servo.h>
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
-#include <ESP32Servo.h>
 
 enum class ServoState {
-  Open, Closed
+  Open,
+  Closed,
+  Actuating
 };
 
-constexpr char* ssid = "EXOSKELETON_WIFI";
-constexpr char* password = "FENG498EXO";
+struct MotionCommand {
+  int start1;
+  int target1;
 
-AsyncWebServer server(80);
+  int start2;
+  int target2;
 
-Servo servo1;
-Servo servo2;
+  uint32_t startTime;
+  uint32_t durationMs;
+
+  bool active;
+};
 
 constexpr int servoPin1 = 3;
 constexpr int servoPin2 = 4;
@@ -23,23 +30,39 @@ constexpr int SERVO1_CLOSE = 50;
 constexpr int SERVO2_OPEN = 70;
 constexpr int SERVO2_CLOSE = 0;
 
+Servo servo1;
+Servo servo2;
+
 ServoState servoState;
+MotionCommand motion;
 
-// -------------------------
-// WIFI
-// -------------------------
-void connectWiFi() {
-  WiFi.mode(WIFI_AP);
-  WiFi.softAP(ssid, password);
+constexpr char* ssid = "EXOSKELETON_WIFI";
+constexpr char* password = "FENG498EXO";
 
-  Serial.println("SoftAP started!");
-  Serial.print("IP address: ");
-  Serial.println(WiFi.softAPIP());
+AsyncWebServer server(80);
+
+void setupServos();
+void startMotion(int from1, int to1, int from2, int to2, float duration);
+void moveOpen(float duration);
+void moveClose(float duration);
+void updateMotion();
+
+void setupWiFi();
+void setupServer();
+
+void setup() {
+  Serial.begin(115200);
+  Serial.println("Serial port started at 115200 baud!");
+
+  setupWiFi();
+  setupServos();
+  setupServer();
 }
 
-// -------------------------
-// SERVOS
-// -------------------------
+void loop() {
+  updateMotion();
+}
+
 void setupServos() {
   servo1.attach(servoPin1);
   servo2.attach(servoPin2);
@@ -50,45 +73,92 @@ void setupServos() {
   servoState = ServoState::Open;
 }
 
-// -------------------------
-// MOTION ENGINE
-// -------------------------
-void moveServoSmooth(Servo& servo, int from, int to, float duration) {
+void startMotion(
+  int from1,
+  int to1,
+  int from2,
+  int to2,
+  float duration) {
+  motion.start1 = from1;
+  motion.target1 = to1;
 
-  int steps = 50;
-  float dt = duration / steps;
+  motion.start2 = from2;
+  motion.target2 = to2;
 
-  for (int i = 0; i <= steps; i++) {
+  motion.startTime = millis();
+  motion.durationMs = duration * 1000.0f;
 
-    float t = (float)i / steps;
-    int angle = from + (to - from) * t;
+  motion.active = true;
 
-    servo.write(angle);
-
-    delay(dt * 1000);
-  }
+  servoState = ServoState::Actuating;
 }
 
 void moveOpen(float duration) {
-  if (servoState != ServoState::Open) {
-    servoState = ServoState::Open;
-    moveServoSmooth(servo1, SERVO1_CLOSE, SERVO1_OPEN, duration);
-    moveServoSmooth(servo2, SERVO2_CLOSE, SERVO2_OPEN, duration);
+  if (servoState == ServoState::Closed) {
+    startMotion(
+      SERVO1_CLOSE,
+      SERVO1_OPEN,
+      SERVO2_CLOSE,
+      SERVO2_OPEN,
+      duration);
   }
 }
 
 void moveClose(float duration) {
-  if (servoState != ServoState::Closed) {
-    servoState = ServoState::Closed;
-    moveServoSmooth(servo1, SERVO1_OPEN, SERVO1_CLOSE, duration);
-    moveServoSmooth(servo2, SERVO2_OPEN, SERVO2_CLOSE, duration);
+  if (servoState == ServoState::Open) {
+    startMotion(
+      SERVO1_OPEN,
+      SERVO1_CLOSE,
+      SERVO2_OPEN,
+      SERVO2_CLOSE,
+      duration);
   }
+}
+
+void updateMotion() {
+  if (!motion.active)
+    return;
+
+  uint32_t elapsed = millis() - motion.startTime;
+
+  float t =
+    (float)elapsed / (float)motion.durationMs;
+
+  if (t > 1.0f)
+    t = 1.0f;
+
+  int angle1 =
+    motion.start1 + (motion.target1 - motion.start1) * t;
+
+  int angle2 =
+    motion.start2 + (motion.target2 - motion.start2) * t;
+
+  servo1.write(angle1);
+  servo2.write(angle2);
+
+  if (t >= 1.0f) {
+    motion.active = false;
+
+    if (motion.target1 == SERVO1_OPEN)
+      servoState = ServoState::Open;
+    else
+      servoState = ServoState::Closed;
+  }
+}
+
+void setupWiFi() {
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP(ssid, password);
+
+  Serial.println("SoftAP started!");
+  Serial.print("IP address: ");
+  Serial.println(WiFi.softAPIP());
 }
 
 void setupServer() {
   server.on("/ping", HTTP_GET, [](AsyncWebServerRequest* request) {
-    request->send(200, "text/plain", "OK");
     Serial.printf("\nNEW REQUEST ON '/ping'!\n");
+    request->send(200, "text/plain", "OK");
   });
 
   server.on(
@@ -102,32 +172,16 @@ void setupServer() {
       String mode = doc["mode"];
       float duration = doc["duration"];
 
+      Serial.printf("\nNEW REQUEST ON '/move'!\nmode: %s\nduration: %f\n", mode.c_str(), duration);
+
       if (mode == "OPEN") {
         moveOpen(duration);
       } else if (mode == "CLOSE") {
         moveClose(duration);
       }
 
-      Serial.printf("\nNEW REQUEST ON '/move'!\nmode: %s\nduration: %f\n", mode.c_str(), duration);
-
       request->send(200, "text/plain", "OK");
     });
 
   server.begin();
-}
-
-// -------------------------
-// SETUP
-// -------------------------
-void setup() {
-  Serial.begin(115200);
-  Serial.println("Serial port started at 115200 baud!");
-
-  connectWiFi();
-  setupServos();
-  setupServer();
-}
-
-void loop() {
-  // Async server -> empty
 }
