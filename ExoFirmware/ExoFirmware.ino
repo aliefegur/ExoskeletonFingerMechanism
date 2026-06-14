@@ -121,17 +121,14 @@ void updateMotion() {
 
   uint32_t elapsed = millis() - motion.startTime;
 
-  float t =
-    (float)elapsed / (float)motion.durationMs;
+  float t = (float)elapsed / (float)motion.durationMs;
+  float smoothT = t * t * (3.0f - 2.0f * t);
 
   if (t > 1.0f)
     t = 1.0f;
 
-  int angle1 =
-    motion.start1 + (motion.target1 - motion.start1) * t;
-
-  int angle2 =
-    motion.start2 + (motion.target2 - motion.start2) * t;
+  int angle1 = motion.start1 + (motion.target1 - motion.start1) * smoothT;
+  int angle2 = motion.start2 + (motion.target2 - motion.start2) * smoothT;
 
   servo1.write(angle1);
   servo2.write(angle2);
