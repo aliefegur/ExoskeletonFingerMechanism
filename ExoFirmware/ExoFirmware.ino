@@ -14,16 +14,21 @@ Servo servo2;
 int servoPin1 = 3;
 int servoPin2 = 4;
 
+// -------------------------
+// WIFI
+// -------------------------
 void connectWiFi() {
-  WiFi.begin(ssid, password);
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP(ssid, password);
 
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-  }
-
-  Serial.println(WiFi.localIP());
+  Serial.println("SoftAP started!");
+  Serial.print("IP address: ");
+  Serial.println(WiFi.softAPIP());
 }
 
+// -------------------------
+// SERVOS
+// -------------------------
 void setupServos() {
   servo1.attach(servoPin1);
   servo2.attach(servoPin2);
@@ -32,28 +37,9 @@ void setupServos() {
   servo2.write(90);
 }
 
-server.on("/ping", HTTP_GET, [](AsyncWebServerRequest* request) {
-  request->send(200, "text/plain", "OK");
-});
-
-server.on(
-  "/move", HTTP_POST, [](AsyncWebServerRequest* request) {}, NULL,
-  [](AsyncWebServerRequest* request, uint8_t* data, size_t len, size_t index, size_t total) {
-    StaticJsonDocument<200> doc;
-    deserializeJson(doc, data);
-
-    String mode = doc["mode"];
-    float duration = doc["duration"];
-
-    if (mode == "OPEN") {
-      moveOpen(duration);
-    } else if (mode == "CLOSE") {
-      moveClose(duration);
-    }
-
-    request->send(200, "text/plain", "OK");
-  });
-
+// -------------------------
+// MOTION ENGINE
+// -------------------------
 void moveServoSmooth(Servo& servo, int from, int to, float duration) {
 
   int steps = 50;
@@ -80,15 +66,49 @@ void moveClose(float duration) {
   moveServoSmooth(servo2, 180, 90, duration);
 }
 
-void setup() {
-  Serial.begin(115200);
+void setupServer() {
 
-  connectWiFi();
-  setupServos();
+  server.on("/ping", HTTP_GET, [](AsyncWebServerRequest* request) {
+    request->send(200, "text/plain", "OK");
+    Serial.printf("\nNEW REQUEST ON '/ping'!\n");
+  });
+
+  server.on(
+    "/move", HTTP_POST,
+    [](AsyncWebServerRequest* request) {},
+    NULL,
+    [](AsyncWebServerRequest* request, uint8_t* data, size_t len, size_t index, size_t total) {
+      StaticJsonDocument<200> doc;
+      deserializeJson(doc, data);
+
+      String mode = doc["mode"];
+      float duration = doc["duration"];
+
+      /*if (mode == "OPEN") {
+        moveOpen(duration);
+      } else if (mode == "CLOSE") {
+        moveClose(duration);
+      }*/
+      Serial.printf("\nNEW REQUEST ON '/move'!\nmode: %s\nduration: %f\n", mode.c_str(), duration);
+
+      request->send(200, "text/plain", "OK");
+    });
 
   server.begin();
 }
 
+// -------------------------
+// SETUP
+// -------------------------
+void setup() {
+  Serial.begin(115200);
+  Serial.println("Serial port started at 115200 baud!");
+
+  connectWiFi();
+  setupServos();
+  setupServer();
+}
+
 void loop() {
-  // Left empty since async server is used
+  // Async server -> empty
 }
