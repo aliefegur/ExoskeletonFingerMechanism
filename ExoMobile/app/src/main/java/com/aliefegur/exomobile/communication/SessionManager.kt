@@ -5,39 +5,69 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-data class ConnectionState(
-    val isConnected: Boolean = false,
-    val lastSuccess: Boolean = true,
-    val lastError: String? = null
-)
+class SessionManager(
+    private val apiClient: ApiClient
+) {
 
-class SessionManager(private val apiClient: ApiClient) {
     private val mutex = Mutex()
 
     private val _state = MutableStateFlow(ConnectionState())
     val state: StateFlow<ConnectionState> = _state
 
-    suspend fun sendMotionCommand(
-        mode: String,
-        duration: Float
-    ): Boolean = mutex.withLock {
+    // -------------------------
+    // CONNECTION CHECK
+    // -------------------------
+
+    suspend fun ping(): Boolean = mutex.withLock {
 
         return try {
-            val result = apiClient.sendMotionCommand(mode, duration)
+            val ok = apiClient.ping()
 
             _state.value = _state.value.copy(
-                isConnected = result,
-                lastSuccess = result,
-                lastError = if (!result) "Command failed" else null
+                isConnected = ok,
+                lastPingSuccess = ok,
+                lastError = if (!ok) "Ping failed" else null
             )
 
-            result
+            ok
 
         } catch (e: Exception) {
 
             _state.value = _state.value.copy(
                 isConnected = false,
-                lastSuccess = false,
+                lastPingSuccess = false,
+                lastError = e.message
+            )
+
+            false
+        }
+    }
+
+    // -------------------------
+    // COMMAND WITH ACK
+    // -------------------------
+
+    suspend fun sendCommandWithAck(
+        mode: String,
+        duration: Float
+    ): Boolean = mutex.withLock {
+
+        return try {
+            val response = apiClient.sendMotionCommand(mode, duration)
+
+            val success = response == "OK"
+
+            _state.value = _state.value.copy(
+                isConnected = success,
+                lastError = if (!success) "ACK failed" else null
+            )
+
+            success
+
+        } catch (e: Exception) {
+
+            _state.value = _state.value.copy(
+                isConnected = false,
                 lastError = e.message
             )
 

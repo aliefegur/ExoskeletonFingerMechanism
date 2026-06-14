@@ -10,7 +10,7 @@ class ApiClient(private val baseUrl: String) {
     suspend fun sendMotionCommand(
         mode: String,
         duration: Float
-    ): Boolean = withContext(Dispatchers.IO) {
+    ): String = withContext(Dispatchers.IO) {
 
         val url = URL("$baseUrl/move")
 
@@ -18,8 +18,8 @@ class ApiClient(private val baseUrl: String) {
             requestMethod = "POST"
             setRequestProperty("Content-Type", "application/json")
             doOutput = true
-            connectTimeout = 2000
-            readTimeout = 2000
+            connectTimeout = 3000
+            readTimeout = 3000
         }
 
         val json = JSONObject().apply {
@@ -27,19 +27,39 @@ class ApiClient(private val baseUrl: String) {
             put("duration", duration)
         }
 
+        connection.outputStream.use {
+            it.write(json.toString().toByteArray())
+        }
+
         return@withContext try {
 
-            connection.outputStream.use {
-                it.write(json.toString().toByteArray())
-            }
+            val response = connection.inputStream.bufferedReader().readText()
+
+            connection.disconnect()
+
+            response // ESP32 "OK" döndürmeli
+
+        } catch (e: Exception) {
+            connection.disconnect()
+            "ERROR"
+        }
+    }
+
+    suspend fun ping(): Boolean = withContext(Dispatchers.IO) {
+
+        return@withContext try {
+            val url = URL("$baseUrl/ping")
+
+            val connection = url.openConnection() as HttpURLConnection
+            connection.connectTimeout = 2000
+            connection.readTimeout = 2000
 
             val code = connection.responseCode
             connection.disconnect()
 
-            code in 200..299
+            code == 200
 
         } catch (e: Exception) {
-            connection.disconnect()
             false
         }
     }

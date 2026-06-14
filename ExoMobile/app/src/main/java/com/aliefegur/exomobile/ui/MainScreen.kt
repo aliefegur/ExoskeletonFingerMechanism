@@ -4,20 +4,14 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-
-enum class MotionMode {
-    OPEN, CLOSE
-}
+import com.aliefegur.exomobile.communication.MotionMode
 
 @Composable
 fun MainScreen(
-    onRun: (MotionMode, Float) -> Unit = { _, _ -> }
+    viewModel: MainViewModel
 ) {
-    var selectedMode by remember { mutableStateOf(MotionMode.CLOSE) }
-    var duration by remember { mutableFloatStateOf(3f) }
-    var isRunning by remember { mutableStateOf(false) }
+    val state = viewModel.uiState.collectAsState().value
 
     Scaffold { innerPadding ->
 
@@ -31,82 +25,74 @@ fun MainScreen(
 
             Text(
                 text = "Exoskeleton Controller",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
+                style = MaterialTheme.typography.headlineSmall
             )
 
-            Text(
-                text = "Select Motion Mode",
-                style = MaterialTheme.typography.titleMedium
-            )
-
+            // -------------------------
             // MODE SELECTION
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
+            // -------------------------
+
+            Text("Motion Mode")
+
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
 
                 FilterChip(
-                    selected = selectedMode == MotionMode.OPEN,
-                    onClick = { selectedMode = MotionMode.OPEN },
-                    label = { Text("OPEN (Finger Extend)") }
+                    selected = state.mode == MotionMode.OPEN,
+                    onClick = { viewModel.onModeSelected(MotionMode.OPEN) },
+                    label = { Text("OPEN") }
                 )
 
                 FilterChip(
-                    selected = selectedMode == MotionMode.CLOSE,
-                    onClick = { selectedMode = MotionMode.CLOSE },
-                    label = { Text("CLOSE (Finger Flex)") }
+                    selected = state.mode == MotionMode.CLOSE,
+                    onClick = { viewModel.onModeSelected(MotionMode.CLOSE) },
+                    label = { Text("CLOSE") }
                 )
             }
 
-            HorizontalDivider()
+            // -------------------------
+            // DURATION
+            // -------------------------
 
-            // DURATION CONTROL
-            Text(
-                text = "Movement Duration: ${"%.1f".format(duration)} sec",
-                style = MaterialTheme.typography.titleMedium
-            )
+            Text("Duration: ${"%.1f".format(state.duration)} sec")
 
             Slider(
-                value = duration,
-                onValueChange = { duration = it },
-                valueRange = 0.5f..10f,
-                steps = 18
+                value = state.duration,
+                onValueChange = { viewModel.onDurationChanged(it) },
+                valueRange = 0.5f..10f
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            // -------------------------
+            // ACTIONS
+            // -------------------------
 
-            // RUN BUTTON
             Button(
-                onClick = {
-                    isRunning = true
-                    onRun(selectedMode, duration)
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                enabled = !isRunning
+                onClick = { viewModel.onRunClicked() },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !state.isSending
             ) {
-                Text(if (isRunning) "Running..." else "RUN MOVEMENT")
+                Text(
+                    if (state.isSending) "Sending..."
+                    else "RUN MOVEMENT"
+                )
             }
 
-            // STOP BUTTON (future expansion)
             OutlinedButton(
-                onClick = {
-                    isRunning = false
-                },
+                onClick = { viewModel.onStopClicked() },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("STOP")
             }
 
-            Spacer(modifier = Modifier.weight(1f))
-
+            // -------------------------
             // STATUS
-            Text(
-                text = "Mode: ${selectedMode.name}",
-                style = MaterialTheme.typography.bodyMedium
-            )
+            // -------------------------
+
+            state.lastStatus?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
         }
     }
 }
